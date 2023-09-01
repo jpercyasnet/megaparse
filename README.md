@@ -1,2 +1,2 @@
-# megapase
-Rust-GTK4 program to parse out from megacmd ls 
+# megaparse
+Rust-iced program to parse out from megacmd ls for comparison with rclone lsf 
