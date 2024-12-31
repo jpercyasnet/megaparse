@@ -1,13 +1,11 @@
-use iced::widget::{button, column, row, text_input, text, horizontal_space, progress_bar};
-use iced::{Alignment, Element, Command, Application, Settings, Color};
-use iced::theme::{self, Theme};
-use iced::executor;
-use iced::window;
+use iced::widget::{button, column, row, text_input, text, progress_bar, Space};
+use iced::{Alignment, Element, Task, Color};
+use iced::theme::{Theme};
 use iced_futures::futures;
 use futures::channel::mpsc;
 extern crate chrono;
 use std::process::Command as stdCommand;
-use std::path::{Path};
+use std::path::Path;
 use std::io::{Write, BufRead, BufReader};
 use std::fs::File;
 use std::time::Duration as timeDuration;
@@ -24,24 +22,21 @@ use execpress::execpress;
 
 pub fn main() -> iced::Result {
 
-     let mut widthxx: u32 = 1350;
-     let mut heightxx: u32 = 750;
+     let mut widthxx: f32 = 1350.0;
+     let mut heightxx: f32 = 750.0;
      let (errcode, errstring, widtho, heighto) = get_winsize();
      if errcode == 0 {
-         widthxx = widtho - 20;
-         heightxx = heighto - 75;
+         widthxx = widtho as f32 - 20.0;
+         heightxx = heighto as f32 - 75.0;
          println!("{}", errstring);
      } else {
          println!("**ERROR {} get_winsize: {}", errcode, errstring);
      }
+     iced::application(Megaparse::title, Megaparse::update, Megaparse::view)
+        .window_size((widthxx, heightxx))
+        .theme(Megaparse::theme)
+        .run_with(Megaparse::new)
 
-     Megaparse::run(Settings {
-        window: window::Settings {
-            size: (widthxx, heightxx),
-            ..window::Settings::default()
-        },
-        ..Settings::default()
-     })
 }
 
 struct Megaparse {
@@ -68,35 +63,23 @@ enum Message {
     ProgRtn(Result<Progstart, Error>),
 }
 
-impl Application for Megaparse {
-    type Message = Message;
-    type Theme = Theme;
-    type Flags = ();
-    type Executor = executor::Default;
-    fn new(_flags: Self::Flags) -> (Megaparse, iced::Command<Message>) {
+impl Megaparse {
+    fn new() -> (Megaparse, iced::Task<Message>) {
         let (tx_send, rx_receive) = mpsc::unbounded();
-//        let mut heightxx: f32 = 190.0;
-//        let (errcode, errstring, _widtho, heighto) = get_winsize();
-//        if errcode == 0 {
-//            heightxx = 190.0 + ((heighto as f32 - 768.0) / 2.0);
-//            println!("{}", errstring);
-//        } else {
-//         println!("**ERROR {} get_winsize: {}", errcode, errstring);
-//        }
         ( Self { mega_value: "--".to_string(), msg_value: "no message".to_string(),
-               rows_num: 0, mess_color: Color::from([0.0, 0.0, 0.0]), rclone_value: "--".to_string(), 
+               rows_num: 0, mess_color: Color::from([0.0, 0.0, 1.0]), rclone_value: "--".to_string(), 
                utc_value: "-1".to_string(), do_progress: false, progval: 0.0, tx_send, rx_receive,
  
           },
-          Command::none()
+          Task::none()
         )
     }
 
     fn title(&self) -> String {
-        String::from("Mega parse of file list -- iced")
+        String::from("Mega parse of file list for just name and size, but creates another with time -- iced")
     }
 
-    fn update(&mut self, message: Message) -> Command<Message>  {
+    fn update(&mut self, message: Message) -> Task<Message>  {
         match message {
             Message::MegaPressed => {
                let mut inputstr: String = self.mega_value.clone();
@@ -146,9 +129,9 @@ impl Application for Megaparse {
                } else {
                    self.mess_color = Color::from([1.0, 0.0, 0.0]);
                }
-               Command::none()
+               Task::none()
            }
-            Message::UtcChanged(value) => { self.utc_value = value; Command::none() }
+            Message::UtcChanged(value) => { self.utc_value = value; Task::none() }
             Message::RclonePressed => {
                let mut inputstr: String = self.rclone_value.clone();
                if !Path::new(&inputstr).exists() {
@@ -164,18 +147,18 @@ impl Application for Megaparse {
                } else {
                    self.mess_color = Color::from([1.0, 0.0, 0.0]);
                }
-               Command::none()
+               Task::none()
             }
             Message::ExecPressed => {
                let (errcode, errstr) = execpress(self.mega_value.clone(), self.rclone_value.clone(), self.rows_num.clone(), self.utc_value.clone());
                self.msg_value = errstr.to_string();
                if errcode == 0 {
                    self.mess_color = Color::from([0.0, 1.0, 0.0]);
-                   Command::perform(Execx::execit(self.mega_value.clone(),self.rclone_value.clone(), self.rows_num.clone(), self.utc_value.clone(), self.tx_send.clone()), Message::ExecxFound)
+                   Task::perform(Execx::execit(self.mega_value.clone(),self.rclone_value.clone(), self.rows_num.clone(), self.utc_value.clone(), self.tx_send.clone()), Message::ExecxFound)
 
                } else {
                    self.mess_color = Color::from([1.0, 0.0, 0.0]);
-                   Command::none()
+                   Task::none()
                }
             }
             Message::ExecxFound(Ok(exx)) => {
@@ -185,16 +168,16 @@ impl Application for Megaparse {
                } else {
                    self.mess_color = Color::from([1.0, 0.0, 0.0]);
                }
-               Command::none()
+               Task::none()
             }
             Message::ExecxFound(Err(_error)) => {
                self.msg_value = "error in copyx copyit routine".to_string();
                self.mess_color = Color::from([1.0, 0.0, 0.0]);
-               Command::none()
+               Task::none()
             }
             Message::ProgressPressed => {
                    self.do_progress = true;
-                   Command::perform(Progstart::pstart(), Message::ProgRtn)
+                   Task::perform(Progstart::pstart(), Message::ProgRtn)
             }
             Message::ProgRtn(Ok(_prx)) => {
               if self.do_progress {
@@ -208,13 +191,13 @@ impl Application for Megaparse {
                     let progvec: Vec<&str> = inputval[0..].split("|").collect();
                     let lenpg1 = progvec.len();
                     if lenpg1 == 3 {
-                        let prog1 = progvec[0].clone().to_string();
+                        let prog1 = progvec[0].to_string();
                         if prog1 == "Progress" {
-                            let num_int: i32 = progvec[1].clone().parse().unwrap_or(-9999);
+                            let num_int: i32 = progvec[1].parse().unwrap_or(-9999);
                             if num_int == -9999 {
                                 println!("progress numeric not numeric: {}", inputval);
                             } else {
-                                let dem_int: i32 = progvec[2].clone().parse().unwrap_or(-9999);
+                                let dem_int: i32 = progvec[2].parse().unwrap_or(-9999);
                                 if dem_int == -9999 {
                                     println!("progress numeric not numeric: {}", inputval);
                                 } else {
@@ -230,15 +213,15 @@ impl Application for Megaparse {
                         println!("message not progress: {}", inputval);
                     }
                 }             
-                Command::perform(Progstart::pstart(), Message::ProgRtn)
+                Task::perform(Progstart::pstart(), Message::ProgRtn)
               } else {
-                Command::none()
+                Task::none()
               }
             }
             Message::ProgRtn(Err(_error)) => {
                 self.msg_value = "error in Progstart::pstart routine".to_string();
                 self.mess_color = Color::from([1.0, 0.0, 0.0]);
-               Command::none()
+               Task::none()
             }
 
         }
@@ -247,42 +230,34 @@ impl Application for Megaparse {
     fn view(&self) -> Element<Message> {
         column![
             row![text("Message:").size(20),
-                 text(&self.msg_value).size(30).style(*&self.mess_color),
-            ].align_items(Alignment::Center).spacing(10).padding(10),
-            row![button("mega-ls -lr input file Button").on_press(Message::MegaPressed).style(theme::Button::Secondary),
+                 text(&self.msg_value).size(30).color(*&self.mess_color),
+            ].align_y(Alignment::Center).spacing(10).padding(10),
+            row![button("mega-ls -lr input file Button").on_press(Message::MegaPressed),
                  text(&self.mega_value).size(20).width(1000)
-            ].align_items(Alignment::Center).spacing(10).padding(10),
-            row![text(format!("number of rows: {}", self.rows_num)).size(20), horizontal_space(100),
+            ].align_y(Alignment::Center).spacing(10).padding(10),
+            row![text(format!("number of rows: {}", self.rows_num)).size(20), Space::with_width(100),
                  text("UTC offset: "),
                  text_input("No input....", &self.utc_value)
                             .on_input(Message::UtcChanged).padding(10).size(20),
-            ].align_items(Alignment::Center).spacing(10).padding(10),
-            row![button("rclone lsf input file Button").on_press(Message::RclonePressed).style(theme::Button::Secondary),
+            ].align_y(Alignment::Center).spacing(10).padding(10),
+            row![button("rclone lsf ... --format ps input file Button").on_press(Message::RclonePressed),
                  text(&self.rclone_value).size(20).width(1000)
-            ].align_items(Alignment::Center).spacing(10).padding(10),
-            row![horizontal_space(200),
-                 button("Exec Button").on_press(Message::ExecPressed).style(theme::Button::Secondary),
-            ].align_items(Alignment::Center).spacing(10).padding(10),
+            ].align_y(Alignment::Center).spacing(10).padding(10),
+            row![Space::with_width(200),
+                 button("Exec Button").on_press(Message::ExecPressed),
+            ].align_y(Alignment::Center).spacing(10).padding(10),
             row![button("Start Progress Button").on_press(Message::ProgressPressed),
                  progress_bar(0.0..=100.0,self.progval),
                  text(format!("{}%", &self.progval)).size(30),
-            ].align_items(Alignment::Center).spacing(5).padding(10),
+            ].align_y(Alignment::Center).spacing(5).padding(10),
          ]
         .padding(5)
-        .align_items(Alignment::Start)
+        .align_x(Alignment::Start)
         .into()
     }
 
     fn theme(&self) -> Theme {
-//       Theme::Light
-          Theme::custom(theme::Palette {
-                        background: Color::from_rgb8(240, 240, 240),
-                        text: Color::BLACK,
-                        primary: Color::from_rgb8(230, 230, 230),
-                        success: Color::from_rgb(0.0, 1.0, 0.0),
-                        danger: Color::from_rgb(1.0, 0.0, 0.0),
-                    })
-               
+       Theme::Dracula
     }
 }
 
@@ -296,15 +271,17 @@ impl Execx {
 //    const TOTAL: u16 = 807;
 
     async fn execit(mega_value: String, rclone_value: String, rows_num: u64, utc_value: String, tx_send: mpsc::UnboundedSender<String>,) -> Result<Execx, Error> {
-     let mut errstring  = "tess of exec ".to_string();
+     let mut errstring  = "begin of async".to_string();
      let mut errcode: u32 = 0;
      let mut bolok = true;
      let numrows: u64 = rows_num;
      let numutc = utc_value.parse().unwrap_or(-99);
-     let targetfullname = format!("{}__tmp3", mega_value);
+     let targettfullname = format!("{}T.csv", mega_value);
+     let targetntfullname = format!("{}nT.csv", mega_value);
      let file = File::open(mega_value).unwrap(); 
      let mut reader = BufReader::new(file);
-     let mut targetfile = File::create(targetfullname.clone()).unwrap();
+     let mut targetfilet = File::create(targettfullname.clone()).unwrap();
+     let mut targetfilent = File::create(targetntfullname.clone()).unwrap();
      let mut line = String::new();
      let mut linenum = 0;
      let mut sdir = "--".to_string();
@@ -318,7 +295,7 @@ impl Execx {
                linenum = linenum + 1;
                if !line.starts_with("d") {
                    if line.starts_with("---- ") || line.starts_with("-ep- ") {
-                       let sizval = line.get(9..20).unwrap().to_string();
+                       let sizval = line.get(10..22).unwrap().to_string();
          		       let test_int: i64 = sizval.trim().parse().unwrap_or(-99);
                        let ssize;
          		       if test_int >= 0 {
@@ -326,8 +303,8 @@ impl Execx {
          		       } else {
          		           ssize = format!("invalid size value: -{}-", sizval.trim());
          		       }
-                       let mut sdate = line.get(21..31).unwrap().to_string();
-                       let mut stime = line.get(32..40).unwrap().to_string();
+                       let mut sdate = line.get(23..33).unwrap().to_string();
+                       let mut stime = line.get(34..42).unwrap().to_string();
                        if numutc != 0 {
                            let mut dateyr1: i64 = 0;
                            let mut datemo1: i64 = 0;
@@ -348,7 +325,7 @@ impl Execx {
                                   errcode = 2;
                                } else {
                                    for indl in 0..lendat1 {
-                                        let date_int: i32 = date1ar1[indl].clone().parse().unwrap_or(-9999);
+                                        let date_int: i32 = date1ar1[indl].parse().unwrap_or(-9999);
                                         if date_int == -9999 {
                                             errstring = "invalid time 2".to_string();
                                             errcode = 3;
@@ -363,7 +340,7 @@ impl Execx {
                                    }
                                    if errcode == 0 {
                                        for indk in 0..lentime1 {
-                                            let time_int: i32 = time1ar1[indk].clone().parse().unwrap_or(-9999);
+                                            let time_int: i32 = time1ar1[indk].parse().unwrap_or(-9999);
                                             if time_int == -9999 {
                                                 errstring = "invalid time 3".to_string();
                                                 errcode = 5;
@@ -390,14 +367,18 @@ impl Execx {
                                sdate = format!("invalid date or time: {}", sdate);
                            }
                        }
-                       let sfile = line.get(41..(bytes_read-1)).unwrap().to_string();
-                       let stroutput;
+                       let sfile = line.get(43..(bytes_read-1)).unwrap().to_string();
+                       let stroutputt;
+                       let stroutputnt;
                        if sdir == "" {
-                           stroutput = format!("{},{},{} {}", sfile, ssize, sdate, stime);
+                           stroutputt = format!("{},{},{} {}", sfile, ssize, sdate, stime);
+                           stroutputnt = format!("{},{}", sfile, ssize);
                        } else {
-                           stroutput = format!("{}/{},{},{} {}", sdir, sfile, ssize, sdate, stime);
+                           stroutputt = format!("{}/{},{},{} {}", sdir, sfile, ssize, sdate, stime);
+                           stroutputnt = format!("{}/{},{}", sdir, sfile, ssize);
                        }
-                       writeln!(&mut targetfile, "{}", stroutput).unwrap();
+                       writeln!(&mut targetfilet, "{}", stroutputt).unwrap();
+                       writeln!(&mut targetfilent, "{}", stroutputnt).unwrap();
                    } else {
                        if line.contains(":") {
 //                         println!("sdir:-{}- topdir:-{}- line: {} value: {}", sdir, topdir, linenum, line.get(0..(bytes_read-1)).unwrap());
@@ -428,19 +409,59 @@ impl Execx {
            }
         }
      }
+     let targetrcfullname = format!("{}nT.csv", rclone_value);
+     if bolok {
+         let filerc = File::open(rclone_value).unwrap(); 
+         let mut readerrc = BufReader::new(filerc);
+         let mut targetrcfilent = File::create(targetrcfullname.clone()).unwrap();
+         let mut linerc = String::new();
+         let mut linenumrc = 0;
+         loop {
+            match readerrc.read_line(&mut linerc) {
+               Ok(bytes_readrc) => {
+                   if bytes_readrc == 0 {
+                       break;
+                   }
+                   linenumrc = linenumrc + 1;
+                   let linerclen = linerc.len();
+                   if !linerc.starts_with('"') {
+                       let lineval = linerc.get(0..(linerclen-1)).unwrap().to_string();
+                       writeln!(&mut targetrcfilent, "{}", lineval).unwrap();
+                   } else {
+                       let lendqtpos = linerc.rfind('"').unwrap();
+                       if lendqtpos < 2 {
+                           let lineval1 = linerc.get(0..(linerclen-1)).unwrap().to_string();
+                           writeln!(&mut targetrcfilent, "{}", lineval1).unwrap();
+                       } else {
+                           let linercst = linerc.get(1..lendqtpos).unwrap().to_string();
+                           let linercend = linerc.get((lendqtpos+1)..(linerclen-1)).unwrap().to_string();
+                           writeln!(&mut targetrcfilent, "{}{}", linercst, linercend).unwrap();
+                       }
+                   }
+                   linerc.clear();
+                }
+                Err(_err) => {
+                   errstring = "error reading rclone file: do file i and iconv".to_string();
+                   errcode = 1;
+                   bolok = false;   
+                   break;
+                }
+            }
+         }
+     }
      if bolok {
          errstring = "source file exists and read".to_string();
-         let sortfullname = format!("{}__sort", targetfullname);
+         let sortfullname = format!("{}__sort", targetntfullname);
 
          let _output = stdCommand::new("sort")
                                          .arg("-o")
                                          .arg(&sortfullname)
-                                         .arg(&targetfullname)
+                                         .arg(&targetntfullname)
                                          .output()
                                          .expect("failed to execute process");
          stdCommand::new("meld")
                            .arg(&sortfullname)
-                           .arg(&rclone_value)
+                           .arg(&targetrcfullname)
                            .spawn()
                            .expect("failed to execute process");
 
