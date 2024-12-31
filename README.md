@@ -10,5 +10,7 @@ Need to run the following terminal commands before using this app:
 Run this app using outputfile2 for mega-ls and outputfile1 for rclone lsf.
    
 This app will parse mega-ls and sort the file and execute Meld for comparison.
+
+This program calls winitsize to get smallest monitor size.
     
-<img src="image/megap.png" width="800px" />
+<img src="image/megaparse131.png" width="800px" />
